@@ -1,91 +1,153 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
-import uvicorn
-import cv2
-import numpy as np
-import string
-import tensorflow as tf
-import os
 from fastapi.middleware.cors import CORSMiddleware
+from routes import user_routes  # User-related routes
+import tensorflow as tf
+import numpy as np
+import cv2
+import string
+from sqlalchemy.orm import Session
+from database import SessionLocal
+from models.user import User
+from pydantic import BaseModel
 
-app = FastAPI()
-# Allow cross-origin requests (CORS)
+# =================== #
+# === App Config ==== #
+# =================== #
+app = FastAPI(
+    title="OCR + User Auth API",
+    description="FastAPI backend for OCR digit recognition with user registration and login",
+    version="1.0.0"
+)
+
+# ============================= #
+# === CORS Middleware Setup === #
+# ============================= #
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins (or specify specific origins like ["http://localhost:3000"])
+    allow_origins=["*"],  # You can restrict to ["http://localhost:3000"] for frontend
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-# Constants
-alphabet = string.digits + '.'  # Allowed characters for the OCR
-blank_index = len(alphabet)  # Blank character index used in CTC loss
-MODEL_PATH = "model_float16.tflite"  # Path to your trained TFLite model
 
-# Function to prepare input for the model
+# ============================= #
+# === Route Registrations  ==== #
+# ============================= #
+app.include_router(user_routes.router, prefix="/users", tags=["Users"])
+
+# ============================= #
+# === QR Code Models ========= #
+# ============================= #
+class QRCodeData(BaseModel):
+    username: str
+
+# ============================= #
+# === Database Dependency ===== #
+# ============================= #
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# ============================= #
+# === QR Code Endpoint ======= #
+# ============================= #
+@app.post("/scan-qr", response_model=dict)
+async def scan_qr(qr_data: QRCodeData, db: Session = Depends(get_db)):
+    """
+    Endpoint to handle QR code scanning and return user details
+    """
+    try:
+        # Query the database for the user
+        user = db.query(User).filter(User.username == qr_data.username).first()
+        
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail=f"User with username '{qr_data.username}' not found"
+            )
+        
+        # Return user details
+        return {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "message": "User found successfully"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing QR code: {str(e)}"
+        )
+
+# ============================= #
+# === OCR Model Constants   ==== #
+# ============================= #
+alphabet = string.digits + '.'
+blank_index = len(alphabet)
+MODEL_PATH = "model_float16.tflite"
+
+# ============================= #
+# === OCR Helper Functions  ==== #
+# ============================= #
+
 def prepare_input(image_bytes):
     """
-    Preprocesses the image to fit the model's input requirements:
-    - Converts to grayscale.
-    - Resizes to (200x31) pixels.
-    - Normalizes pixel values to the range [0, 1].
+    Converts input image bytes to normalized grayscale tensor with shape (1, 31, 200, 1)
     """
-    file_bytes = np.frombuffer(image_bytes, np.uint8)  # Convert byte data to numpy array
-    input_data = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)  # Decode to grayscale image
-    input_data = cv2.resize(input_data, (200, 31))  # Resize to match model input size
-    input_data = input_data[np.newaxis, :, :, np.newaxis]  # Add batch and channel dimensions
-    input_data = input_data.astype('float32') / 255.0  # Normalize pixel values
-    return input_data
+    file_bytes = np.frombuffer(image_bytes, np.uint8)
+    image = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
+    image = cv2.resize(image, (200, 31))  # Resize for model
+    image = image[np.newaxis, :, :, np.newaxis].astype('float32') / 255.0
+    return image
 
-# Function to run the prediction using the TFLite model
 def predict(image_bytes):
     """
-    Makes a prediction using the provided image bytes.
-    Loads the TFLite model, prepares the input data, and gets the output.
+    Runs inference on the given image bytes using TFLite model.
     """
     interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
-    interpreter.allocate_tensors()  # Allocate tensors for the interpreter
+    interpreter.allocate_tensors()
+    input_data = prepare_input(image_bytes)
 
-    input_data = prepare_input(image_bytes)  # Prepare input data for prediction
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
 
-    input_details = interpreter.get_input_details()  # Get model input details
-    output_details = interpreter.get_output_details()  # Get model output details
-
-    # Set input tensor and invoke model
     interpreter.set_tensor(input_details[0]['index'], input_data)
     interpreter.invoke()
 
-    # Get output tensor and return it
     output = interpreter.get_tensor(output_details[0]['index'])
     return output
 
-# Decode the output tensor into human-readable text
 def decode_output(output):
     """
-    Decodes the output tensor into a string using the allowed characters in the alphabet.
-    Converts the string to a float if it contains a decimal point.
+    Decodes TFLite model output into a readable string.
     """
-    text = "".join(alphabet[index] for index in output[0] if index not in [blank_index, -1])  # Decode
+    text = "".join(alphabet[index] for index in output[0] if index not in [blank_index, -1])
     try:
         if '.' in text:
-            text = str(float(text))  # Convert to float if it contains a decimal point
+            return str(float(text))  # Convert to float string if possible
     except ValueError:
-        pass  # If the conversion fails, keep the original text
+        pass
     return text
 
-# FastAPI endpoint to handle image upload and prediction
-@app.post("/predict")
-async def predict_image(file: UploadFile = File(...)):
-    """
-    API endpoint to accept an image file upload from the frontend and return the extracted text.
-    """
-    try:
-        image_bytes = await file.read()  # Read image data as bytes from the frontend
-        output = predict(image_bytes)  # Run prediction on the image
-        result = decode_output(output)  # Decode the predicted output
-        return {"result": result}  # Return the extracted text to the frontend
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})  # Handle errors gracefully
+# ============================= #
+# === Prediction Endpoint   ==== #
+# ============================= #
 
-# Run the server using uvicorn (this line can be used in a terminal)
+@app.post("/predict", summary="Predict digits from image", description="Uploads an image and returns predicted text")
+async def predict_image(file: UploadFile = File(...)):
+    try:
+        image_bytes = await file.read()
+        output = predict(image_bytes)
+        result = decode_output(output)
+        return {"result": result}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+# ============================= #
+# === Run Command (terminal) === #
+# ============================= #
 # uvicorn server:app --host 0.0.0.0 --port 8000
