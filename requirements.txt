@@ -1,5 +1,6 @@
-setuptools>=61.0
-wheel
+# Build tools for packages like numpy, ml_dtypes, etc.
+setuptools>=67.0.0
+wheel>=0.40.0
 
 absl-py==2.2.2
 annotated-types==0.7.0
