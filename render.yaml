@@ -1,7 +1,3 @@
-services:
-  - type: web
-    name: meter-to-invoice
-    env: python
-    runtime: python-3.10
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m uvicorn server:app --host 0.0.0.0 --port $PORT
+buildCommand: |
+  pip install --upgrade pip setuptools wheel
+  pip install -r requirements.txt
