@@ -8,7 +8,6 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True)
     email = Column(String(100), unique=True, index=True)
-    password = Column(String(100))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=True)
@@ -19,3 +18,8 @@ class User(Base):
     unit_consumed = Column(Float, nullable=True)
     total_amount = Column(Float, nullable=True)
     last_reading_date = Column(DateTime(timezone=True), nullable=True)
+    # Additional user info
+    zone = Column(String(50), nullable=True)
+    meter_number = Column(String(50), nullable=True)
+    contact_number = Column(String(20), nullable=True)
+    address = Column(String(255), nullable=True)

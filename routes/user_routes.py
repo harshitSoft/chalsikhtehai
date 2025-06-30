@@ -26,9 +26,14 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter((User.username == user.username) | (User.email == user.email)).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username or email already registered")
-    
-    hashed_password = pwd_context.hash(user.password)
-    new_user = User(username=user.username, email=user.email, hashed_password=hashed_password)
+    new_user = User(
+        username=user.username,
+        email=user.email,
+        zone=user.zone,
+        meter_number=user.meter_number,
+        contact_number=user.contact_number,
+        address=user.address
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -37,8 +42,5 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 # Login existing user
 @router.post("/login")
 def login_user(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.username == user.username).first()
-    if not db_user or not pwd_context.verify(user.password, db_user.hashed_password):
-        raise HTTPException(status_code=400, detail="Invalid username or password")
-    
-    return {"message": "Login successful", "user_id": db_user.id}
+    # Remove password check from login_user or disable login if not needed
+    return {"message": "Login successful", "user_id": user.username}

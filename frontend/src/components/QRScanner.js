@@ -53,6 +53,7 @@ import { useReactToPrint } from 'react-to-print';
 const QRScanner = () => {
     const [scanResult, setScanResult] = useState(null);
     const [userData, setUserData] = useState(null);
+    const [qrUserData, setQrUserData] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
     const [scannerActive, setScannerActive] = useState(true);
@@ -108,6 +109,8 @@ const QRScanner = () => {
 
             if (!qrData.username) throw new Error('Invalid QR code format');
 
+            setQrUserData(qrData);
+
             const response = await axios.post('http://localhost:8000/scan-qr', { username: qrData.username });
             setUserData(response.data);
             setScanResult(decodedText);
@@ -129,6 +132,7 @@ const QRScanner = () => {
         setBillingData(null);
         setError(null);
         setScannerActive(true);
+        setQrUserData(null);
     };
 
     const handleFileUpload = async (event) => {
@@ -326,7 +330,7 @@ const QRScanner = () => {
                                                 <PersonIcon color="action" />
                                             </ListItemIcon>
                                             <ListItemText 
-                                                primary={userData.username} 
+                                                primary={qrUserData?.username || userData.username} 
                                                 secondary="Customer Name" 
                                             />
                                         </ListItem>
@@ -335,7 +339,7 @@ const QRScanner = () => {
                                                 <EmailIcon color="action" />
                                             </ListItemIcon>
                                             <ListItemText 
-                                                primary={userData.email} 
+                                                primary={qrUserData?.email || userData.email} 
                                                 secondary="Email Address" 
                                             />
                                         </ListItem>
@@ -344,7 +348,7 @@ const QRScanner = () => {
                                                 <HomeIcon color="action" />
                                             </ListItemIcon>
                                             <ListItemText 
-                                                primary="123, Avantika Nagar, Indore" 
+                                                primary={qrUserData?.address || "123, Avantika Nagar, Indore"} 
                                                 secondary="Service Address" 
                                             />
                                         </ListItem>
@@ -353,10 +357,32 @@ const QRScanner = () => {
                                                 <PhoneIcon color="action" />
                                             </ListItemIcon>
                                             <ListItemText 
-                                                primary="+91 9876543210" 
+                                                primary={qrUserData?.contact_number || "+91 9876543210"} 
                                                 secondary="Contact Number" 
                                             />
                                         </ListItem>
+                                        {qrUserData?.zone && (
+                                            <ListItem sx={{ px: 0 }}>
+                                                <ListItemIcon sx={{ minWidth: 36 }}>
+                                                    <HomeIcon color="action" />
+                                                </ListItemIcon>
+                                                <ListItemText 
+                                                    primary={qrUserData.zone} 
+                                                    secondary="Zone" 
+                                                />
+                                            </ListItem>
+                                        )}
+                                        {qrUserData?.meter_number && (
+                                            <ListItem sx={{ px: 0 }}>
+                                                <ListItemIcon sx={{ minWidth: 36 }}>
+                                                    <DescriptionIcon color="action" />
+                                                </ListItemIcon>
+                                                <ListItemText 
+                                                    primary={qrUserData.meter_number} 
+                                                    secondary="Meter Number" 
+                                                />
+                                            </ListItem>
+                                        )}
                                     </List>
                                 </Grid>
                                 <Grid item xs={12} md={6}>
