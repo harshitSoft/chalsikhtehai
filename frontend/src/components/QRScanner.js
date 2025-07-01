@@ -15,7 +15,6 @@ import {
     DialogActions,
     Grid,
     LinearProgress,
-    Chip,
     Avatar,
     List,
     ListItem,
@@ -28,6 +27,7 @@ import {
     TableHead,
     TableRow,
     Stack,
+    TextField,
 } from '@mui/material';
 import {
     Upload as UploadIcon,
@@ -46,9 +46,12 @@ import {
     AccountBalance as BankIcon,
     Warning as WarningIcon,
     QrCodeScanner as QrCodeIcon,
+    PictureAsPdf as PdfIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useReactToPrint } from 'react-to-print';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const QRScanner = () => {
     const [scanResult, setScanResult] = useState(null);
@@ -63,6 +66,8 @@ const QRScanner = () => {
     const [captureError, setCaptureError] = useState(null);
     const [billingData, setBillingData] = useState(null);
     const [uploadProgress, setUploadProgress] = useState(0);
+    const [editableReading, setEditableReading] = useState(null);
+    const [editableConsumption, setEditableConsumption] = useState(null);
 
     const fileInputRef = useRef(null);
     const videoRef = useRef(null);
@@ -81,6 +86,29 @@ const QRScanner = () => {
         `,
     });
 
+    const handleDownloadPDF = async () => {
+        if (!invoiceRef.current) return;
+        
+        try {
+            const canvas = await html2canvas(invoiceRef.current, {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                logging: false,
+            });
+            
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 210; // A4 width in mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            
+            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+            pdf.save(`invoice_${generateInvoiceNumber()}.pdf`);
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+        }
+    };
+
     useEffect(() => {
         if (scannerActive) {
             const scanner = new Html5QrcodeScanner('reader', {
@@ -95,6 +123,13 @@ const QRScanner = () => {
             return () => scanner.clear();
         }
     }, [scannerActive]);
+
+    useEffect(() => {
+        if (meterReading && billingData) {
+            setEditableReading(meterReading);
+            setEditableConsumption(billingData.unit_consumed);
+        }
+    }, [meterReading, billingData]);
 
     const onScanSuccess = async (decodedText) => {
         try {
@@ -237,6 +272,26 @@ const QRScanner = () => {
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + 15);
         return dueDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+
+    const handleReadingChange = (e) => {
+        const value = parseFloat(e.target.value);
+        setEditableReading(isNaN(value) ? 0 : value);
+        if (billingData?.last_unit) {
+            setEditableConsumption(isNaN(value) ? 0 : (value - billingData.last_unit).toFixed(2));
+        }
+    };
+
+    const handleConsumptionChange = (e) => {
+        const value = parseFloat(e.target.value);
+        setEditableConsumption(isNaN(value) ? 0 : value);
+    };
+
+    const calculateTotalAmount = () => {
+        const consumption = editableConsumption || billingData?.unit_consumed || 0;
+        const baseAmount = (consumption * 12.5) + 75;
+        const gst = baseAmount * 0.18;
+        return (baseAmount + gst).toFixed(2);
     };
 
     return (
@@ -448,8 +503,27 @@ const QRScanner = () => {
                                                 <Typography variant="subtitle2" color="text.secondary">
                                                     Current Reading
                                                 </Typography>
-                                                <Typography variant="h5" color="primary">
-                                                    {meterReading} units
+                                                <TextField
+                                                    value={editableReading}
+                                                    onChange={handleReadingChange}
+                                                    variant="standard"
+                                                    type="number"
+                                                    InputProps={{
+                                                        endAdornment: "units",
+                                                        disableUnderline: true,
+                                                        style: { fontSize: '1.5rem' }
+                                                    }}
+                                                    sx={{ 
+                                                        '& .MuiInput-input': { 
+                                                            color: 'primary.main',
+                                                            fontWeight: 'medium'
+                                                        }
+                                                    }}
+                                                    fullWidth
+                                                    className="no-print"
+                                                />
+                                                <Typography variant="h5" color="primary" sx={{ display: ['none', 'none', 'block'] }}>
+                                                    {editableReading} units
                                                 </Typography>
                                             </Paper>
                                         </Grid>
@@ -468,8 +542,27 @@ const QRScanner = () => {
                                                 <Typography variant="subtitle2" color="text.secondary">
                                                     Consumption
                                                 </Typography>
-                                                <Typography variant="h5" color="secondary">
-                                                    {billingData?.unit_consumed || 'N/A'} units
+                                                <TextField
+                                                    value={editableConsumption}
+                                                    onChange={handleConsumptionChange}
+                                                    variant="standard"
+                                                    type="number"
+                                                    InputProps={{
+                                                        endAdornment: "units",
+                                                        disableUnderline: true,
+                                                        style: { fontSize: '1.5rem', color: 'secondary.main' }
+                                                    }}
+                                                    sx={{ 
+                                                        '& .MuiInput-input': { 
+                                                            color: 'secondary.main',
+                                                            fontWeight: 'medium'
+                                                        }
+                                                    }}
+                                                    fullWidth
+                                                    className="no-print"
+                                                />
+                                                <Typography variant="h5" color="secondary" sx={{ display: ['none', 'none', 'block'] }}>
+                                                    {editableConsumption} units
                                                 </Typography>
                                             </Paper>
                                         </Grid>
@@ -493,9 +586,9 @@ const QRScanner = () => {
                                             <TableBody>
                                                 <TableRow>
                                                     <TableCell>Gas Consumption Charges</TableCell>
-                                                    <TableCell align="right">{billingData?.unit_consumed || 0}</TableCell>
+                                                    <TableCell align="right">{editableConsumption || billingData?.unit_consumed || 0}</TableCell>
                                                     <TableCell align="right">12.50</TableCell>
-                                                    <TableCell align="right">{(billingData?.unit_consumed * 12.5).toFixed(2)}</TableCell>
+                                                    <TableCell align="right">{(editableConsumption * 12.5 || billingData?.unit_consumed * 12.5 || 0).toFixed(2)}</TableCell>
                                                 </TableRow>
                                                 <TableRow>
                                                     <TableCell>Fixed Monthly Charges</TableCell>
@@ -508,7 +601,7 @@ const QRScanner = () => {
                                                     <TableCell align="right">-</TableCell>
                                                     <TableCell align="right">-</TableCell>
                                                     <TableCell align="right">
-                                                        {((billingData?.unit_consumed * 12.5 + 75) * 0.18).toFixed(2)}
+                                                        {((editableConsumption * 12.5 + 75 || billingData?.unit_consumed * 12.5 + 75 || 75) * 0.18).toFixed(2)}
                                                     </TableCell>
                                                 </TableRow>
                                                 <TableRow sx={{ '&:last-child td': { borderBottom: 0 } }}>
@@ -519,7 +612,7 @@ const QRScanner = () => {
                                                     </TableCell>
                                                     <TableCell align="right">
                                                         <Typography variant="h6" color="primary">
-                                                            ₹{billingData?.total_amount || '0.00'}
+                                                            ₹{calculateTotalAmount()}
                                                         </Typography>
                                                     </TableCell>
                                                 </TableRow>
@@ -582,10 +675,11 @@ const QRScanner = () => {
                                             </Button>
                                             <Button 
                                                 variant="contained" 
-                                                color="success"
-                                                className="no-print"
+                                                color="error"
+                                                onClick={handleDownloadPDF}
+                                                startIcon={<PdfIcon />}
                                             >
-                                                Make Payment
+                                                Download PDF
                                             </Button>
                                         </Stack>
                                     </Box>
