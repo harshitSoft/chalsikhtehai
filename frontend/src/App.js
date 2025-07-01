@@ -30,6 +30,8 @@ import {
 import Navbar from './components/Navbar';
 import QRScanner from './components/QRScanner';
 import QRGenerator from './components/QRGenerator';
+import AdminPanel from './components/AdminPanel';
+import UserSectionTable from './components/UserList';
 
 // Theme Configuration
 const theme = createTheme({
@@ -324,11 +326,15 @@ function App() {
       <CssBaseline />
       <Router>
         <Navbar />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/scan" element={<QRScanner />} />
-          <Route path="/generate" element={<QRGenerator />} />
-        </Routes>
+        <Container maxWidth="lg">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/scan" element={<QRScanner />} />
+            <Route path="/generate" element={<QRGenerator />} />
+            <Route path="/users" element={<UserSectionTable />} />
+            <Route path="/admin-panel" element={<AdminPanel />} />
+          </Routes>
+        </Container>
       </Router>
     </ThemeProvider>
   );
