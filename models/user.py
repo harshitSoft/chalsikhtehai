@@ -23,3 +23,8 @@ class User(Base):
     meter_number = Column(String(50), nullable=True)
     contact_number = Column(String(20), nullable=True)
     address = Column(String(255), nullable=True)
+    late_fees = Column(Float, nullable=True, default=0)
+    role = Column(String(20), nullable=False, default='customer')
+    created_by = Column(Integer, nullable=True)
+    area = Column(String(100), nullable=True)
+    bill_count = Column(Integer, nullable=False, default=0)

@@ -56,6 +56,7 @@ class QRCodeData(BaseModel):
 class MeterReadingData(BaseModel):
     username: str
     reading: float
+    staff_id: int
 
 # ============================= #
 # === Database Dependency ===== #
@@ -105,6 +106,15 @@ async def scan_qr(qr_data: QRCodeData, db: Session = Depends(get_db)):
             "unit_consumed": user.unit_consumed or 0,
             "total_amount": user.total_amount or 0,
             "last_reading_date": user.last_reading_date.isoformat() if user.last_reading_date else None,
+            # Add any other fields needed by frontend
+            "zone": user.zone,
+            "meter_number": user.meter_number,
+            "contact_number": user.contact_number,
+            "address": user.address,
+            "late_fees": user.late_fees,
+            "role": user.role,
+            "area": user.area,
+            "bill_count": user.bill_count,
             "message": "User found successfully",
             "status": "success"
         }
@@ -232,6 +242,11 @@ async def update_meter_reading(reading_data: MeterReadingData, db: Session = Dep
         # Calculate billing (example rate: ₹5 per unit)
         RATE_PER_UNIT = 5
         user.total_amount = user.unit_consumed * RATE_PER_UNIT
+        
+        # Increment bill_count for staff
+        staff = db.query(User).filter(User.id == reading_data.staff_id, User.role == 'staff').first()
+        if staff:
+            staff.bill_count = (staff.bill_count or 0) + 1
         
         db.commit()
         db.refresh(user)
