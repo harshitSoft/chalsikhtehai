@@ -1,14 +1,82 @@
-import React, { useState } from 'react';
-import { Box, Typography, Paper, TextField, Button, MenuItem, Divider, List, ListItem, ListItemText, Select, InputLabel, FormControl, Alert } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { 
+  Box, 
+  Typography, 
+  Paper, 
+  TextField, 
+  Button, 
+  MenuItem, 
+  Divider, 
+  List, 
+  ListItem, 
+  ListItemText, 
+  Select, 
+  InputLabel, 
+  FormControl, 
+  Alert,
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableContainer, 
+  TableHead, 
+  TableRow, 
+  CircularProgress,
+  Grid,
+  Card,
+  CardContent,
+  CardHeader,
+  Avatar,
+  Chip,
+  LinearProgress,
+  IconButton,
+  Collapse
+} from '@mui/material';
+import { 
+  Lock as LockIcon, 
+  PersonAdd as PersonAddIcon,
+  People as PeopleIcon,
+  Business as BusinessIcon,
+  Person as PersonIcon,
+  Receipt as ReceiptIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon
+} from '@mui/icons-material';
+import { styled } from '@mui/material/styles';
 import axios from 'axios';
 import UserSectionTable from './UserList';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress } from '@mui/material';
+import { teal, indigo, deepPurple, blue, pink } from '@mui/material/colors';
 
 const roles = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'staff', label: 'Staff' },
-  { value: 'customer', label: 'Customer' },
+  { value: 'admin', label: 'Admin', icon: <BusinessIcon />, color: indigo[500] },
+  { value: 'staff', label: 'Staff', icon: <PeopleIcon />, color: teal[500] },
+  { value: 'customer', label: 'Customer', icon: <PersonIcon />, color: blue[500] },
 ];
+
+const ExpandableSection = styled(Paper)(({ theme }) => ({
+  marginBottom: theme.spacing(3),
+  overflow: 'hidden',
+  transition: 'box-shadow 0.3s ease',
+  '&:hover': {
+    boxShadow: theme.shadows[6],
+  },
+}));
+
+const SectionHeader = styled(CardHeader)(({ theme }) => ({
+  backgroundColor: theme.palette.primary.main,
+  color: theme.palette.common.white,
+  cursor: 'pointer',
+  '& .MuiCardHeader-action': {
+    margin: 0,
+    alignSelf: 'center',
+  }
+}));
+
+const RoleChip = styled(Chip)(({ theme, role }) => ({
+  backgroundColor: roles.find(r => r.value === role)?.color || theme.palette.grey[500],
+  color: theme.palette.common.white,
+  fontWeight: 500,
+  marginLeft: theme.spacing(1),
+}));
 
 const AdminPanel = () => {
   // Admin login state
@@ -30,10 +98,24 @@ const AdminPanel = () => {
   const [customers, setCustomers] = useState([]);
   const [adminId, setAdminId] = useState('');
   const [staffId, setStaffId] = useState('');
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState({ text: '', severity: 'info' });
   const [allStaff, setAllStaff] = useState([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState('');
+  
+  // Expanded sections state
+  const [expanded, setExpanded] = useState({
+    createUser: true,
+    allAdmins: false,
+    adminStaff: false,
+    staffCustomers: false,
+    staffBills: true,
+    allUsers: false
+  });
+
+  const toggleSection = (section) => {
+    setExpanded(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   // Admin login handler
   const handleAdminLogin = async (e) => {
@@ -41,7 +123,6 @@ const AdminPanel = () => {
     setLoginError('');
     try {
       const res = await axios.get('http://localhost:8000/users/user/all');
-      // Find admin by created_by and role == 'admin'
       const admin = res.data.find(u => String(u.created_by) === adminLoginCreatedBy && u.role === 'admin');
       if (admin) {
         setIsAdmin(true);
@@ -57,66 +138,71 @@ const AdminPanel = () => {
   // Create user (admin, staff, customer)
   const handleCreate = async (e) => {
     e.preventDefault();
-    setMessage('');
-    let url = '';
+    setMessage({ text: '', severity: 'info' });
+    
     if (!form.username || !form.email || !form.role || (form.role !== 'admin' && !form.created_by)) {
-      setMessage('Please fill all required fields.');
+      setMessage({ text: 'Please fill all required fields.', severity: 'error' });
       return;
     }
+    
+    let url = '';
     if (form.role === 'admin') url = 'http://localhost:8000/users/user/create-admin';
     else if (form.role === 'staff') url = 'http://localhost:8000/users/user/create-staff';
     else url = 'http://localhost:8000/users/user/create-customer';
-    // Only allow staff creation if logged in as admin
+    
     if (form.role === 'staff' && !isAdmin) {
-      setMessage('Only admins can create staff.');
+      setMessage({ text: 'Only admins can create staff.', severity: 'error' });
       return;
     }
+    
     try {
       await axios.post(url, form);
-      setMessage('User created!');
+      setMessage({ text: 'User created successfully!', severity: 'success' });
+      // Reset form except for role
+      setForm(prev => ({ ...prev, username: '', email: '', created_by: '', area: '' }));
     } catch (err) {
-      setMessage('Error: ' + (err.response?.data?.detail || err.message));
+      setMessage({ text: 'Error: ' + (err.response?.data?.detail || err.message), severity: 'error' });
     }
   };
 
   // List all admins
   const fetchAdmins = async () => {
-    setMessage('');
+    setMessage({ text: '', severity: 'info' });
     try {
       const res = await axios.get('http://localhost:8000/users/user/all-admins');
       setAdmins(res.data);
     } catch (err) {
-      setMessage('Error fetching admins: ' + (err.response?.data?.detail || err.message));
+      setMessage({ text: 'Error fetching admins: ' + (err.response?.data?.detail || err.message), severity: 'error' });
     }
   };
 
   // List staff for an admin
   const fetchStaff = async () => {
-    setMessage('');
+    setMessage({ text: '', severity: 'info' });
     if (!adminId) {
-      setMessage('Please enter Admin ID.');
+      setMessage({ text: 'Please enter Admin ID.', severity: 'error' });
       return;
     }
     try {
       const res = await axios.get(`http://localhost:8000/users/user/admin/${adminId}/staff`);
       setStaff(res.data);
     } catch (err) {
-      setMessage('Error fetching staff: ' + (err.response?.data?.detail || err.message));
+      setMessage({ text: 'Error fetching staff: ' + (err.response?.data?.detail || err.message), severity: 'error' });
     }
   };
 
   // List customers for a staff
   const fetchCustomers = async () => {
-    setMessage('');
+    setMessage({ text: '', severity: 'info' });
     if (!staffId) {
-      setMessage('Please enter Staff ID.');
+      setMessage({ text: 'Please enter Staff ID.', severity: 'error' });
       return;
     }
     try {
       const res = await axios.get(`http://localhost:8000/users/user/staff/${staffId}/customers`);
       setCustomers(res.data);
     } catch (err) {
-      setMessage('Error fetching customers: ' + (err.response?.data?.detail || err.message));
+      setMessage({ text: 'Error fetching customers: ' + (err.response?.data?.detail || err.message), severity: 'error' });
     }
   };
 
@@ -135,184 +221,537 @@ const AdminPanel = () => {
   };
 
   // Fetch staff on admin login
-  React.useEffect(() => {
+  useEffect(() => {
     if (isAdmin) fetchAllStaff();
   }, [isAdmin]);
 
   // If not logged in as admin, show login form
   if (!isAdmin) {
     return (
-      <Box sx={{ maxWidth: 400, mx: 'auto', mt: 8, p: 3, borderRadius: 2, boxShadow: 3, background: '#fff' }}>
-        <Typography variant="h5" sx={{ mb: 2 }}>Admin Login</Typography>
-        <form onSubmit={handleAdminLogin}>
-          <TextField
-            label="Created By (Superadmin ID)"
-            value={adminLoginCreatedBy}
-            onChange={e => setAdminLoginCreatedBy(e.target.value)}
-            type="text"
-            fullWidth
-            required
-            sx={{ mb: 2 }}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+          p: 2
+        }}
+      >
+        <Card sx={{ maxWidth: 450, width: '100%', boxShadow: 3 }}>
+          <CardHeader
+            avatar={
+              <Avatar sx={{ bgcolor: deepPurple[500] }}>
+                <LockIcon />
+              </Avatar>
+            }
+            title={
+              <Typography variant="h5" component="div">
+                Admin Portal
+              </Typography>
+            }
+            subheader="Enter your superadmin credentials"
+            sx={{ bgcolor: deepPurple[700], color: 'white', textAlign: 'center' }}
           />
-          <Button type="submit" variant="contained" color="primary" fullWidth>Login</Button>
-        </form>
-        {loginError && <Alert severity="error" sx={{ mt: 2 }}>{loginError}</Alert>}
+          <CardContent>
+            <form onSubmit={handleAdminLogin}>
+              <TextField
+                label="Created By (Superadmin ID)"
+                value={adminLoginCreatedBy}
+                onChange={e => setAdminLoginCreatedBy(e.target.value)}
+                type="text"
+                fullWidth
+                required
+                margin="normal"
+                variant="outlined"
+              />
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                fullWidth
+                size="large"
+                sx={{ mt: 2, py: 1.5 }}
+                startIcon={<LockIcon />}
+              >
+                Login
+              </Button>
+            </form>
+            {loginError && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {loginError}
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
       </Box>
     );
   }
 
   // Admin panel UI
   return (
-    <Box sx={{ maxWidth: 700, mx: 'auto', mt: 4, p: 2 }}>
-      <Paper elevation={3} sx={{ p: 3, mb: 4, background: '#1976d2', color: '#fff' }}>
-        <Typography variant="h5">Welcome, Admin {adminName} (Created By: {adminLoginCreatedBy})</Typography>
-      </Paper>
-      <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h5" gutterBottom>
-          Create User (Admin/Staff/Customer)
-        </Typography>
-        <form onSubmit={handleCreate}>
-          <TextField
-            fullWidth
-            label="Username"
-            name="username"
-            value={form.username}
-            onChange={e => setForm({ ...form, username: e.target.value })}
-            margin="normal"
-            required
-          />
-          <TextField
-            fullWidth
-            label="Email"
-            name="email"
-            value={form.email}
-            onChange={e => setForm({ ...form, email: e.target.value })}
-            margin="normal"
-            required
-            type="email"
-          />
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Role</InputLabel>
-            <Select
-              value={form.role}
-              label="Role"
-              onChange={e => setForm({ ...form, role: e.target.value })}
-            >
-              {roles.map(r => (
-                <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          {form.role !== 'admin' && (
-            <TextField
-              fullWidth
-              label="Created By (User ID)"
-              name="created_by"
-              value={form.created_by}
-              onChange={e => setForm({ ...form, created_by: e.target.value })}
-              margin="normal"
-              required
+    <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.default', minHeight: '100vh' }}>
+      <Grid container spacing={3}>
+        {/* Header */}
+        <Grid item xs={12}>
+          <Card sx={{ bgcolor: 'primary.main', color: 'common.white' }}>
+            <CardContent>
+              <Box display="flex" alignItems="center">
+                <Avatar sx={{ bgcolor: 'common.white', color: 'primary.main', mr: 2 }}>
+                  <BusinessIcon />
+                </Avatar>
+                <Box>
+                  <Typography variant="h4" component="h1">
+                    Admin Dashboard
+                  </Typography>
+                  <Typography variant="subtitle1">
+                    Welcome back, {adminName} (ID: {adminLoginCreatedBy})
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Create User Section */}
+        <Grid item xs={12} md={6}>
+          <ExpandableSection>
+            <SectionHeader
+              title="Create New User"
+              subheader="Add admin, staff or customer"
+              avatar={
+                <Avatar sx={{ bgcolor: pink[500] }}>
+                  <PersonAddIcon />
+                </Avatar>
+              }
+              action={
+                <IconButton aria-label="expand" onClick={() => toggleSection('createUser')}>
+                  {expanded.createUser ? <ExpandLessIcon sx={{ color: 'white' }} /> : <ExpandMoreIcon sx={{ color: 'white' }} />}
+                </IconButton>
+              }
+              onClick={() => toggleSection('createUser')}
             />
-          )}
-          <TextField
-            fullWidth
-            label="Area"
-            name="area"
-            value={form.area}
-            onChange={e => setForm({ ...form, area: e.target.value })}
-            margin="normal"
-          />
-          <Button type="submit" variant="contained" color="primary" sx={{ mt: 2 }}>
-            Create
-          </Button>
-        </form>
-        {message && <Typography sx={{ mt: 2 }}>{message}</Typography>}
-      </Paper>
-      <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h6">List All Admins</Typography>
-        <Button onClick={fetchAdmins} variant="outlined" sx={{ my: 2 }}>Fetch Admins</Button>
-        <List>
-          {admins.map(a => (
-            <ListItem key={a.id} divider>
-              <ListItemText primary={`${a.username} (${a.email})`} secondary={`Area: ${a.area}, ID: ${a.id}`} />
-            </ListItem>
-          ))}
-        </List>
-      </Paper>
-      <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h6">List Staff for Admin</Typography>
-        <TextField
-          fullWidth
-          label="Admin ID"
-          value={adminId}
-          onChange={e => setAdminId(e.target.value)}
-          margin="normal"
-        />
-        <Button onClick={fetchStaff} variant="outlined" sx={{ my: 2 }}>Fetch Staff</Button>
-        <List>
-          {staff.map(s => (
-            <ListItem key={s.id} divider>
-              <ListItemText primary={`${s.username} (${s.email})`} secondary={`Area: ${s.area}, ID: ${s.id}`} />
-            </ListItem>
-          ))}
-        </List>
-      </Paper>
-      <Paper elevation={3} sx={{ p: 3 }}>
-        <Typography variant="h6">List Customers for Staff</Typography>
-        <TextField
-          fullWidth
-          label="Staff ID"
-          value={staffId}
-          onChange={e => setStaffId(e.target.value)}
-          margin="normal"
-        />
-        <Button onClick={fetchCustomers} variant="outlined" sx={{ my: 2 }}>Fetch Customers</Button>
-        <List>
-          {customers.map(c => (
-            <ListItem key={c.id} divider>
-              <ListItemText primary={`${c.username} (${c.email})`} secondary={`Area: ${c.area}, ID: ${c.id}`} />
-            </ListItem>
-          ))}
-        </List>
-      </Paper>
-      {/* Staff Bill Count Section */}
-      <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h5" gutterBottom>Staff Bill Count Overview</Typography>
-        {loadingStaff ? (
-          <Box sx={{ textAlign: 'center', py: 2 }}><CircularProgress /></Box>
-        ) : staffError ? (
-          <Typography color="error">{staffError}</Typography>
-        ) : allStaff.length === 0 ? (
-          <Typography>No staff members found.</Typography>
-        ) : (
-          <TableContainer component={Paper} sx={{ mt: 2 }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell><b>Staff Name</b></TableCell>
-                  <TableCell><b>Email</b></TableCell>
-                  <TableCell><b>Area</b></TableCell>
-                  <TableCell><b>Bill Count</b></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {allStaff.map(staff => (
-                  <TableRow key={staff.id}>
-                    <TableCell>{staff.username}</TableCell>
-                    <TableCell>{staff.email}</TableCell>
-                    <TableCell>{staff.area || '-'}</TableCell>
-                    <TableCell><b>{staff.bill_count || 0}</b></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Paper>
-      {/* User Section Table (All Users) */}
-      <UserSectionTable />
+            <Collapse in={expanded.createUser}>
+              <CardContent>
+                <form onSubmit={handleCreate}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Username"
+                        name="username"
+                        value={form.username}
+                        onChange={e => setForm({ ...form, username: e.target.value })}
+                        margin="normal"
+                        required
+                        variant="outlined"
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Email"
+                        name="email"
+                        value={form.email}
+                        onChange={e => setForm({ ...form, email: e.target.value })}
+                        margin="normal"
+                        required
+                        type="email"
+                        variant="outlined"
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <FormControl fullWidth margin="normal">
+                        <InputLabel>Role</InputLabel>
+                        <Select
+                          value={form.role}
+                          label="Role"
+                          onChange={e => setForm({ ...form, role: e.target.value })}
+                          variant="outlined"
+                        >
+                          {roles.map(r => (
+                            <MenuItem key={r.value} value={r.value}>
+                              <Box display="flex" alignItems="center">
+                                <Box mr={1}>{r.icon}</Box>
+                                {r.label}
+                              </Box>
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    {form.role !== 'admin' && (
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          label={`Created By ${form.role === 'staff' ? 'Admin' : 'Staff'} ID`}
+                          name="created_by"
+                          value={form.created_by}
+                          onChange={e => setForm({ ...form, created_by: e.target.value })}
+                          margin="normal"
+                          required
+                          variant="outlined"
+                        />
+                      </Grid>
+                    )}
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Area"
+                        name="area"
+                        value={form.area}
+                        onChange={e => setForm({ ...form, area: e.target.value })}
+                        margin="normal"
+                        variant="outlined"
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        color="primary"
+                        fullWidth
+                        size="large"
+                        startIcon={<PersonAddIcon />}
+                      >
+                        Create User
+                      </Button>
+                    </Grid>
+                  </Grid>
+                </form>
+                {message.text && (
+                  <Alert severity={message.severity} sx={{ mt: 2 }}>
+                    {message.text}
+                  </Alert>
+                )}
+              </CardContent>
+            </Collapse>
+          </ExpandableSection>
+        </Grid>
+
+        {/* All Admins Section */}
+        <Grid item xs={12} md={6}>
+          <ExpandableSection>
+            <SectionHeader
+              title="All Administrators"
+              subheader="List of all admin users"
+              avatar={
+                <Avatar sx={{ bgcolor: indigo[500] }}>
+                  <BusinessIcon />
+                </Avatar>
+              }
+              action={
+                <IconButton aria-label="expand" onClick={() => toggleSection('allAdmins')}>
+                  {expanded.allAdmins ? <ExpandLessIcon sx={{ color: 'white' }} /> : <ExpandMoreIcon sx={{ color: 'white' }} />}
+                </IconButton>
+              }
+              onClick={() => toggleSection('allAdmins')}
+            />
+            <Collapse in={expanded.allAdmins}>
+              <CardContent>
+                <Button
+                  onClick={fetchAdmins}
+                  variant="outlined"
+                  color="primary"
+                  fullWidth
+                  sx={{ mb: 2 }}
+                  startIcon={<PeopleIcon />}
+                >
+                  Load All Admins
+                </Button>
+                {admins.length > 0 ? (
+                  <List dense>
+                    {admins.map(a => (
+                      <ListItem key={a.id} divider>
+                        <ListItemText
+                          primary={
+                            <Box display="flex" alignItems="center">
+                              {a.username}
+                              <RoleChip label="Admin" role="admin" size="small" />
+                            </Box>
+                          }
+                          secondary={
+                            <>
+                              <Box component="span" display="block">Email: {a.email}</Box>
+                              <Box component="span" display="block">ID: {a.id} • Area: {a.area || 'N/A'}</Box>
+                            </>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 2 }}>
+                    No admins loaded. Click the button above to fetch admin list.
+                  </Typography>
+                )}
+              </CardContent>
+            </Collapse>
+          </ExpandableSection>
+        </Grid>
+
+        {/* Admin Staff Section */}
+        <Grid item xs={12} md={6}>
+          <ExpandableSection>
+            <SectionHeader
+              title="Staff Members"
+              subheader="Staff managed by specific admin"
+              avatar={
+                <Avatar sx={{ bgcolor: teal[500] }}>
+                  <PeopleIcon />
+                </Avatar>
+              }
+              action={
+                <IconButton aria-label="expand" onClick={() => toggleSection('adminStaff')}>
+                  {expanded.adminStaff ? <ExpandLessIcon sx={{ color: 'white' }} /> : <ExpandMoreIcon sx={{ color: 'white' }} />}
+                </IconButton>
+              }
+              onClick={() => toggleSection('adminStaff')}
+            />
+            <Collapse in={expanded.adminStaff}>
+              <CardContent>
+                <TextField
+                  fullWidth
+                  label="Admin ID"
+                  value={adminId}
+                  onChange={e => setAdminId(e.target.value)}
+                  margin="normal"
+                  variant="outlined"
+                />
+                <Button
+                  onClick={fetchStaff}
+                  variant="outlined"
+                  color="primary"
+                  fullWidth
+                  sx={{ mb: 2 }}
+                  startIcon={<PeopleIcon />}
+                >
+                  Fetch Staff
+                </Button>
+                {staff.length > 0 ? (
+                  <List dense>
+                    {staff.map(s => (
+                      <ListItem key={s.id} divider>
+                        <ListItemText
+                          primary={
+                            <Box display="flex" alignItems="center">
+                              {s.username}
+                              <RoleChip label="Staff" role="staff" size="small" />
+                            </Box>
+                          }
+                          secondary={
+                            <>
+                              <Box component="span" display="block">Email: {s.email}</Box>
+                              <Box component="span" display="block">ID: {s.id} • Area: {s.area || 'N/A'}</Box>
+                            </>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 2 }}>
+                    Enter Admin ID and click the button to fetch staff members.
+                  </Typography>
+                )}
+              </CardContent>
+            </Collapse>
+          </ExpandableSection>
+        </Grid>
+
+        {/* Staff Customers Section */}
+        <Grid item xs={12} md={6}>
+          <ExpandableSection>
+            <SectionHeader
+              title="Customer List"
+              subheader="Customers managed by specific staff"
+              avatar={
+                <Avatar sx={{ bgcolor: blue[500] }}>
+                  <PersonIcon />
+                </Avatar>
+              }
+              action={
+                <IconButton aria-label="expand" onClick={() => toggleSection('staffCustomers')}>
+                  {expanded.staffCustomers ? <ExpandLessIcon sx={{ color: 'white' }} /> : <ExpandMoreIcon sx={{ color: 'white' }} />}
+                </IconButton>
+              }
+              onClick={() => toggleSection('staffCustomers')}
+            />
+            <Collapse in={expanded.staffCustomers}>
+              <CardContent>
+                <TextField
+                  fullWidth
+                  label="Staff ID"
+                  value={staffId}
+                  onChange={e => setStaffId(e.target.value)}
+                  margin="normal"
+                  variant="outlined"
+                />
+                <Button
+                  onClick={fetchCustomers}
+                  variant="outlined"
+                  color="primary"
+                  fullWidth
+                  sx={{ mb: 2 }}
+                  startIcon={<PersonIcon />}
+                >
+                  Fetch Customers
+                </Button>
+                {customers.length > 0 ? (
+                  <List dense>
+                    {customers.map(c => (
+                      <ListItem key={c.id} divider>
+                        <ListItemText
+                          primary={
+                            <Box display="flex" alignItems="center">
+                              {c.username}
+                              <RoleChip label="Customer" role="customer" size="small" />
+                            </Box>
+                          }
+                          secondary={
+                            <>
+                              <Box component="span" display="block">Email: {c.email}</Box>
+                              <Box component="span" display="block">ID: {c.id} • Area: {c.area || 'N/A'}</Box>
+                            </>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 2 }}>
+                    Enter Staff ID and click the button to fetch customers.
+                  </Typography>
+                )}
+              </CardContent>
+            </Collapse>
+          </ExpandableSection>
+        </Grid>
+
+        {/* Staff Bill Count Section */}
+        <Grid item xs={12}>
+          <ExpandableSection>
+            <SectionHeader
+              title="Staff Performance"
+              subheader="Bill count overview by staff members"
+              avatar={
+                <Avatar sx={{ bgcolor: deepPurple[500] }}>
+                  <ReceiptIcon />
+                </Avatar>
+              }
+              action={
+                <IconButton aria-label="expand" onClick={() => toggleSection('staffBills')}>
+                  {expanded.staffBills ? <ExpandLessIcon sx={{ color: 'white' }} /> : <ExpandMoreIcon sx={{ color: 'white' }} />}
+                </IconButton>
+              }
+              onClick={() => toggleSection('staffBills')}
+            />
+            <Collapse in={expanded.staffBills}>
+              <CardContent>
+                {loadingStaff ? (
+                  <Box sx={{ textAlign: 'center', py: 2 }}>
+                    <CircularProgress />
+                    <Typography variant="body2" sx={{ mt: 1 }}>Loading staff data...</Typography>
+                  </Box>
+                ) : staffError ? (
+                  <Alert severity="error">{staffError}</Alert>
+                ) : allStaff.length === 0 ? (
+                  <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 2 }}>
+                    No staff members found.
+                  </Typography>
+                ) : (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table>
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: 'action.hover' }}>
+                          <TableCell><b>Staff Member</b></TableCell>
+                          <TableCell><b>Contact</b></TableCell>
+                          <TableCell><b>Area</b></TableCell>
+                          <TableCell align="right"><b>Bill Count</b></TableCell>
+                          <TableCell width="30%"><b>Performance</b></TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {allStaff.map(staff => {
+                          const billCount = staff.bill_count || 0;
+                          const progress = Math.min(billCount * 10, 100); // Simple scaling for visualization
+                          return (
+                            <TableRow key={staff.id} hover>
+                              <TableCell>
+                                <Box display="flex" alignItems="center">
+                                  <Avatar sx={{ bgcolor: teal[100], color: teal[800], mr: 2, width: 32, height: 32 }}>
+                                    {staff.username.charAt(0).toUpperCase()}
+                                  </Avatar>
+                                  {staff.username}
+                                </Box>
+                              </TableCell>
+                              <TableCell>{staff.email}</TableCell>
+                              <TableCell>{staff.area || '-'}</TableCell>
+                              <TableCell align="right">
+                                <Chip 
+                                  label={billCount} 
+                                  color={billCount > 0 ? 'primary' : 'default'}
+                                  variant={billCount > 0 ? 'filled' : 'outlined'}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Box display="flex" alignItems="center">
+                                  <Box width="100%" mr={1}>
+                                    <LinearProgress 
+                                      variant="determinate" 
+                                      value={progress} 
+                                      color={
+                                        billCount > 15 ? 'success' : 
+                                        billCount > 5 ? 'primary' : 
+                                        'secondary'
+                                      }
+                                    />
+                                  </Box>
+                                  <Typography variant="body2" color="textSecondary">
+                                    {progress}%
+                                  </Typography>
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </CardContent>
+            </Collapse>
+          </ExpandableSection>
+        </Grid>
+
+        {/* All Users Section */}
+        <Grid item xs={12}>
+          <ExpandableSection>
+            <SectionHeader
+              title="Complete User Directory"
+              subheader="Detailed view of all system users"
+              avatar={
+                <Avatar sx={{ bgcolor: 'secondary.main' }}>
+                  <PeopleIcon />
+                </Avatar>
+              }
+              action={
+                <IconButton aria-label="expand" onClick={() => toggleSection('allUsers')}>
+                  {expanded.allUsers ? <ExpandLessIcon sx={{ color: 'white' }} /> : <ExpandMoreIcon sx={{ color: 'white' }} />}
+                </IconButton>
+              }
+              onClick={() => toggleSection('allUsers')}
+            />
+            <Collapse in={expanded.allUsers}>
+              <CardContent>
+                <UserSectionTable />
+              </CardContent>
+            </Collapse>
+          </ExpandableSection>
+        </Grid>
+      </Grid>
     </Box>
   );
 };
 
-export default AdminPanel; 
+export default AdminPanel;

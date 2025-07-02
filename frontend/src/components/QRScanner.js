@@ -28,6 +28,7 @@ import {
     TableRow,
     Stack,
     TextField,
+    useTheme,
 } from '@mui/material';
 import {
     Upload as UploadIcon,
@@ -54,6 +55,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 const QRScanner = () => {
+    const theme = useTheme();
     const [scanResult, setScanResult] = useState(null);
     const [userData, setUserData] = useState(null);
     const [qrUserData, setQrUserData] = useState(null);
@@ -81,6 +83,54 @@ const QRScanner = () => {
     const scannerRef = useRef(null);
     const invoiceRef = useRef(null);
 
+    // Styles
+    const styles = {
+        primaryCard: {
+            borderRadius: theme.shape.borderRadius * 2,
+            boxShadow: theme.shadows[4],
+            overflow: 'hidden',
+            mb: 4
+        },
+        sectionHeader: {
+            display: 'flex',
+            alignItems: 'center',
+            mb: 2,
+            color: theme.palette.primary.main
+        },
+        invoiceHeader: {
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+            color: theme.palette.primary.contrastText,
+            p: 3,
+        },
+        invoiceFooter: {
+            backgroundColor: theme.palette.grey[100],
+            p: 2,
+            textAlign: 'center'
+        },
+        readingCard: {
+            p: 2,
+            border: `1px solid ${theme.palette.grey[300]}`,
+            borderRadius: theme.shape.borderRadius,
+            height: '100%'
+        },
+        tableHeader: {
+            backgroundColor: theme.palette.grey[100]
+        },
+        paymentInfoBox: {
+            p: 2,
+            backgroundColor: theme.palette.grey[50],
+            borderRadius: theme.shape.borderRadius,
+            border: `1px solid ${theme.palette.grey[200]}`,
+            mb: 3
+        },
+        capturePlaceholder: {
+            p: 4,
+            border: `1px dashed ${theme.palette.grey[400]}`,
+            borderRadius: theme.shape.borderRadius,
+            textAlign: 'center'
+        }
+    };
+
     const handlePrint = useReactToPrint({
         content: () => invoiceRef.current,
         pageStyle: `
@@ -105,7 +155,7 @@ const QRScanner = () => {
             
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF('p', 'mm', 'a4');
-            const imgWidth = 210; // A4 width in mm
+            const imgWidth = 210;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
             
             pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
@@ -342,43 +392,85 @@ const QRScanner = () => {
     };
 
     return (
-        <Box sx={{ maxWidth: 'md', mx: 'auto', my: 4, p: { xs: 1, md: 3 } }}>
+        <Box sx={{ maxWidth: 'md', mx: 'auto', my: 4, p: { xs: 2, md: 3 } }}>
             {staffPromptOpen ? (
-                <Paper elevation={4} sx={{ p: 3, borderRadius: 3, mb: 4, textAlign: 'center' }}>
-                    <Typography variant="h5" sx={{ mb: 2 }}>Enter Created By (Admin ID) to Start Scanning</Typography>
+                <Paper elevation={4} sx={{ 
+                    p: 3, 
+                    borderRadius: theme.shape.borderRadius * 2,
+                    mb: 4, 
+                    textAlign: 'center',
+                    maxWidth: 600,
+                    mx: 'auto'
+                }}>
+                    <Typography variant="h5" sx={{ mb: 3 }} gutterBottom>
+                        Staff Authentication
+                    </Typography>
+                    <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                        Please enter your Admin ID to start scanning customer QR codes
+                    </Typography>
                     <form onSubmit={handleStaffIdSubmit}>
                         <TextField
-                            label="Created By (Admin ID)"
+                            label="Admin ID"
                             value={staffId}
                             onChange={e => setStaffId(e.target.value)}
                             type="text"
                             required
-                            sx={{ mr: 2 }}
+                            fullWidth
+                            sx={{ mb: 2 }}
+                            variant="outlined"
                         />
-                        <Button type="submit" variant="contained">Continue</Button>
+                        <Button 
+                            type="submit" 
+                            variant="contained" 
+                            size="large"
+                            fullWidth
+                        >
+                            Continue
+                        </Button>
                     </form>
                 </Paper>
             ) : (
                 <>
-                    <Box sx={{ mb: 2, textAlign: 'center' }}>
-                        <Typography variant="subtitle1" color="primary">Staff: {staffName} (Created By: {staffId})</Typography>
+                    <Box sx={{ 
+                        mb: 3, 
+                        p: 2,
+                        backgroundColor: theme.palette.primary.light,
+                        color: theme.palette.primary.contrastText,
+                        borderRadius: theme.shape.borderRadius,
+                        textAlign: 'center'
+                    }}>
+                        <Typography variant="subtitle1">
+                            Staff: <strong>{staffName}</strong> (Admin ID: {staffId})
+                        </Typography>
                     </Box>
-                    <Paper elevation={4} sx={{ p: 3, borderRadius: 3, mb: 4 }}>
+
+                    <Card sx={styles.primaryCard}>
                         {!userData && (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 3 }}>
+                            <Box sx={{ 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                gap: 2, 
+                                mb: 3,
+                                p: 3,
+                                flexWrap: 'wrap'
+                            }}>
                                 <Button
                                     variant={qrMode === 'camera' ? 'contained' : 'outlined'}
                                     startIcon={<QrCodeIcon />}
                                     onClick={() => { setQrMode('camera'); setScannerActive(true); }}
+                                    size="large"
+                                    sx={{ minWidth: 200 }}
                                 >
-                                    Scan QR by Camera
+                                    Scan with Camera
                                 </Button>
                                 <Button
                                     variant={qrMode === 'upload' ? 'contained' : 'outlined'}
                                     startIcon={<UploadIcon />}
                                     onClick={() => qrFileInputRef.current?.click()}
+                                    size="large"
+                                    sx={{ minWidth: 200 }}
                                 >
-                                    Select QR from Device
+                                    Upload QR Image
                                 </Button>
                                 <input
                                     type="file"
@@ -390,19 +482,35 @@ const QRScanner = () => {
                             </Box>
                         )}
                         {!userData ? (
-                            <Box>
+                            <Box sx={{ p: 2 }}>
                                 {qrMode === 'camera' && (
                                     <>
-                                        <Box id="reader" sx={{ width: '100%', minHeight: 300 }}></Box>
+                                        <Box id="reader" sx={{ 
+                                            width: '100%', 
+                                            minHeight: 300,
+                                            border: `2px dashed ${theme.palette.grey[300]}`,
+                                            borderRadius: theme.shape.borderRadius
+                                        }}></Box>
                                         <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 2 }}>
-                                            Point your camera at the customer's QR code to begin
+                                            Align the QR code within the frame to scan
                                         </Typography>
                                     </>
                                 )}
                                 {qrMode === 'upload' && (
-                                    <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 2 }}>
-                                        Upload an image of a QR code to scan
-                                    </Typography>
+                                    <Box sx={{ 
+                                        display: 'flex', 
+                                        flexDirection: 'column', 
+                                        alignItems: 'center',
+                                        p: 4
+                                    }}>
+                                        <UploadIcon sx={{ fontSize: 48, color: theme.palette.grey[400], mb: 2 }} />
+                                        <Typography variant="body1" sx={{ mb: 1 }}>
+                                            Upload QR Code Image
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Select an image containing the customer's QR code
+                                        </Typography>
+                                    </Box>
                                 )}
                                 {error && (
                                     <Alert severity="error" sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
@@ -412,15 +520,9 @@ const QRScanner = () => {
                                 )}
                             </Box>
                         ) : (
-                            <Card ref={invoiceRef} sx={{ backgroundColor: '#ffffff', p: 0, border: '1px solid #e0e0e0' }}>
+                            <Box ref={invoiceRef} sx={{ backgroundColor: '#ffffff' }}>
                                 {/* Invoice Header */}
-                                <Box sx={{ 
-                                    backgroundColor: '#1976d2', 
-                                    color: 'white', 
-                                    p: 3, 
-                                    borderTopLeftRadius: 4,
-                                    borderTopRightRadius: 4,
-                                }}>
+                                <Box sx={styles.invoiceHeader}>
                                     <Grid container spacing={2} alignItems="center">
                                         <Grid item xs={12} md={6}>
                                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -454,7 +556,7 @@ const QRScanner = () => {
                                     {/* Customer Information */}
                                     <Grid container spacing={3} sx={{ mb: 3 }}>
                                         <Grid item xs={12} md={6}>
-                                            <Typography variant="h6" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                                            <Typography variant="h6" sx={styles.sectionHeader}>
                                                 <PersonIcon color="primary" sx={{ mr: 1 }} />
                                                 Customer Details
                                             </Typography>
@@ -520,7 +622,7 @@ const QRScanner = () => {
                                             </List>
                                         </Grid>
                                         <Grid item xs={12} md={6}>
-                                            <Typography variant="h6" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                                            <Typography variant="h6" sx={styles.sectionHeader}>
                                                 <ReceiptIcon color="primary" sx={{ mr: 1 }} />
                                                 Invoice Information
                                             </Typography>
@@ -572,13 +674,13 @@ const QRScanner = () => {
                                     {/* Meter Reading Section */}
                                     {meterReading ? (
                                         <Box sx={{ mb: 4 }}>
-                                            <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+                                            <Typography variant="h6" sx={styles.sectionHeader}>
                                                 <GasIcon color="primary" sx={{ mr: 1 }} />
                                                 Meter Reading Details
                                             </Typography>
                                             <Grid container spacing={2} sx={{ mb: 3 }}>
                                                 <Grid item xs={12} md={4}>
-                                                    <Paper elevation={0} sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                                                    <Box sx={styles.readingCard}>
                                                         <Typography variant="subtitle2" color="text.secondary">
                                                             Current Reading
                                                         </Typography>
@@ -604,20 +706,20 @@ const QRScanner = () => {
                                                         <Typography variant="h5" color="primary" sx={{ display: ['none', 'none', 'block'] }}>
                                                             {editableReading} units
                                                         </Typography>
-                                                    </Paper>
+                                                    </Box>
                                                 </Grid>
                                                 <Grid item xs={12} md={4}>
-                                                    <Paper elevation={0} sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                                                    <Box sx={styles.readingCard}>
                                                         <Typography variant="subtitle2" color="text.secondary">
                                                             Previous Reading
                                                         </Typography>
                                                         <Typography variant="h5">
                                                             {billingData?.last_unit || 'N/A'} units
                                                         </Typography>
-                                                    </Paper>
+                                                    </Box>
                                                 </Grid>
                                                 <Grid item xs={12} md={4}>
-                                                    <Paper elevation={0} sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                                                    <Box sx={styles.readingCard}>
                                                         <Typography variant="subtitle2" color="text.secondary">
                                                             Consumption
                                                         </Typography>
@@ -643,18 +745,18 @@ const QRScanner = () => {
                                                         <Typography variant="h5" color="secondary" sx={{ display: ['none', 'none', 'block'] }}>
                                                             {editableConsumption} units
                                                         </Typography>
-                                                    </Paper>
+                                                    </Box>
                                                 </Grid>
                                             </Grid>
 
                                             {/* Billing Details */}
-                                            <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+                                            <Typography variant="h6" sx={styles.sectionHeader}>
                                                 <MoneyIcon color="primary" sx={{ mr: 1 }} />
                                                 Billing Summary
                                             </Typography>
                                             <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e0e0e0', mb: 3 }}>
                                                 <Table>
-                                                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                                                    <TableHead sx={styles.tableHeader}>
                                                         <TableRow>
                                                             <TableCell>Description</TableCell>
                                                             <TableCell align="right">Units</TableCell>
@@ -700,7 +802,7 @@ const QRScanner = () => {
                                             </TableContainer>
 
                                             {/* Payment Information */}
-                                            <Box sx={{ p: 2, backgroundColor: '#f9f9f9', borderRadius: 1, mb: 3 }}>
+                                            <Box sx={styles.paymentInfoBox}>
                                                 <Typography variant="subtitle1" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
                                                     <BankIcon color="primary" sx={{ mr: 1 }} />
                                                     Payment Information
@@ -740,6 +842,7 @@ const QRScanner = () => {
                                                     onClick={handleScanAgain} 
                                                     startIcon={<QrCodeIcon />}
                                                     className="no-print"
+                                                    sx={{ mr: 2 }}
                                                 >
                                                     Scan Another
                                                 </Button>
@@ -749,14 +852,16 @@ const QRScanner = () => {
                                                         color="primary"
                                                         onClick={handlePrint} 
                                                         startIcon={<PrintIcon />}
+                                                        sx={{ minWidth: 180 }}
                                                     >
                                                         Print Invoice
                                                     </Button>
                                                     <Button 
                                                         variant="contained" 
-                                                        color="error"
+                                                        color="secondary"
                                                         onClick={handleDownloadPDF}
                                                         startIcon={<PdfIcon />}
+                                                        sx={{ minWidth: 180 }}
                                                     >
                                                         Download PDF
                                                     </Button>
@@ -764,9 +869,9 @@ const QRScanner = () => {
                                             </Box>
                                         </Box>
                                     ) : (
-                                        <Box sx={{ textAlign: 'center', p: 4, border: '1px dashed #e0e0e0', borderRadius: 1 }}>
+                                        <Box sx={styles.capturePlaceholder}>
                                             <Avatar sx={{ 
-                                                bgcolor: '#1976d2', 
+                                                bgcolor: theme.palette.primary.main, 
                                                 width: 56, 
                                                 height: 56, 
                                                 mb: 2,
@@ -810,13 +915,7 @@ const QRScanner = () => {
                                 </CardContent>
 
                                 {/* Invoice Footer */}
-                                <Box sx={{ 
-                                    backgroundColor: '#f5f5f5', 
-                                    p: 2, 
-                                    textAlign: 'center',
-                                    borderBottomLeftRadius: 4,
-                                    borderBottomRightRadius: 4,
-                                }}>
+                                <Box sx={styles.invoiceFooter}>
                                     <Typography variant="body2" color="text.secondary">
                                         Thank you for choosing Avantika Gas Services
                                     </Typography>
@@ -827,9 +926,9 @@ const QRScanner = () => {
                                         This is a computer generated invoice and does not require signature
                                     </Typography>
                                 </Box>
-                            </Card>
+                            </Box>
                         )}
-                    </Paper>
+                    </Card>
                     
                     {/* Dialog for Camera Capture */}
                     <Dialog 
@@ -837,6 +936,11 @@ const QRScanner = () => {
                         onClose={() => { setCaptureDialogOpen(false); stopCamera(); }}
                         maxWidth="md"
                         fullWidth
+                        PaperProps={{
+                            sx: {
+                                borderRadius: theme.shape.borderRadius * 2
+                            }
+                        }}
                     >
                         <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
                             <CameraIcon color="primary" sx={{ mr: 1 }} />
@@ -853,7 +957,7 @@ const QRScanner = () => {
                                         height: '100%', 
                                         objectFit: 'contain',
                                         backgroundColor: '#000',
-                                        borderRadius: 4
+                                        borderRadius: theme.shape.borderRadius
                                     }} 
                                 />
                                 {captureLoading && (
@@ -864,7 +968,9 @@ const QRScanner = () => {
                                         right: 0, 
                                         p: 2,
                                         backgroundColor: 'rgba(0,0,0,0.5)',
-                                        color: 'white'
+                                        color: 'white',
+                                        borderTopLeftRadius: theme.shape.borderRadius,
+                                        borderTopRightRadius: theme.shape.borderRadius
                                     }}>
                                         <LinearProgress variant="determinate" value={uploadProgress} color="primary" />
                                         <Typography variant="body2" align="center" sx={{ mt: 1 }}>
