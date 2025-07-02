@@ -73,6 +73,7 @@ const QRScanner = () => {
     const [staffPromptOpen, setStaffPromptOpen] = useState(true);
     const [qrMode, setQrMode] = useState('camera');
     const qrFileInputRef = useRef(null);
+    const [staffUserId, setStaffUserId] = useState(null);
 
     const fileInputRef = useRef(null);
     const videoRef = useRef(null);
@@ -181,13 +182,15 @@ const QRScanner = () => {
         e.preventDefault();
         try {
             const res = await axios.get(`http://localhost:8000/users/user/all`);
-            const staff = res.data.find(u => u.id === parseInt(staffId) && u.role === 'staff');
+            const staff = res.data.find(u => String(u.created_by) === staffId && u.role === 'staff');
             if (staff) {
                 setStaffName(staff.username);
+                setStaffUserId(staff.id);
                 setStaffPromptOpen(false);
             } else {
                 setStaffName('');
-                alert('Invalid Staff ID');
+                setStaffUserId(null);
+                alert('Invalid Created By for Staff');
             }
         } catch {
             alert('Failed to fetch staff');
@@ -220,7 +223,7 @@ const QRScanner = () => {
             const billingRes = await axios.post('http://localhost:8000/update-meter-reading', {
                 username: userData.username,
                 reading,
-                staff_id: parseInt(staffId)
+                staff_id: staffUserId
             });
 
             setMeterReading(reading);
@@ -274,7 +277,7 @@ const QRScanner = () => {
             const billingRes = await axios.post('http://localhost:8000/update-meter-reading', {
                 username: userData.username,
                 reading,
-                staff_id: parseInt(staffId)
+                staff_id: staffUserId
             });
 
             setMeterReading(reading);
@@ -342,13 +345,13 @@ const QRScanner = () => {
         <Box sx={{ maxWidth: 'md', mx: 'auto', my: 4, p: { xs: 1, md: 3 } }}>
             {staffPromptOpen ? (
                 <Paper elevation={4} sx={{ p: 3, borderRadius: 3, mb: 4, textAlign: 'center' }}>
-                    <Typography variant="h5" sx={{ mb: 2 }}>Enter Staff ID to Start Scanning</Typography>
+                    <Typography variant="h5" sx={{ mb: 2 }}>Enter Created By (Admin ID) to Start Scanning</Typography>
                     <form onSubmit={handleStaffIdSubmit}>
                         <TextField
-                            label="Staff ID"
+                            label="Created By (Admin ID)"
                             value={staffId}
                             onChange={e => setStaffId(e.target.value)}
-                            type="number"
+                            type="text"
                             required
                             sx={{ mr: 2 }}
                         />
@@ -358,7 +361,7 @@ const QRScanner = () => {
             ) : (
                 <>
                     <Box sx={{ mb: 2, textAlign: 'center' }}>
-                        <Typography variant="subtitle1" color="primary">Staff: {staffName} (ID: {staffId})</Typography>
+                        <Typography variant="subtitle1" color="primary">Staff: {staffName} (Created By: {staffId})</Typography>
                     </Box>
                     <Paper elevation={4} sx={{ p: 3, borderRadius: 3, mb: 4 }}>
                         {!userData && (

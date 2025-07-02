@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Box, Typography, Paper, TextField, Button, MenuItem, Divider, List, ListItem, ListItemText, Select, InputLabel, FormControl, Alert } from '@mui/material';
 import axios from 'axios';
+import UserSectionTable from './UserList';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress } from '@mui/material';
 
 const roles = [
   { value: 'admin', label: 'Admin' },
@@ -10,7 +12,7 @@ const roles = [
 
 const AdminPanel = () => {
   // Admin login state
-  const [adminLoginId, setAdminLoginId] = useState('');
+  const [adminLoginCreatedBy, setAdminLoginCreatedBy] = useState('');
   const [adminName, setAdminName] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [loginError, setLoginError] = useState('');
@@ -29,6 +31,9 @@ const AdminPanel = () => {
   const [adminId, setAdminId] = useState('');
   const [staffId, setStaffId] = useState('');
   const [message, setMessage] = useState('');
+  const [allStaff, setAllStaff] = useState([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [staffError, setStaffError] = useState('');
 
   // Admin login handler
   const handleAdminLogin = async (e) => {
@@ -36,12 +41,13 @@ const AdminPanel = () => {
     setLoginError('');
     try {
       const res = await axios.get('http://localhost:8000/users/user/all');
-      const admin = res.data.find(u => u.id === parseInt(adminLoginId) && u.role === 'admin');
+      // Find admin by created_by and role == 'admin'
+      const admin = res.data.find(u => String(u.created_by) === adminLoginCreatedBy && u.role === 'admin');
       if (admin) {
         setIsAdmin(true);
         setAdminName(admin.username);
       } else {
-        setLoginError('Invalid Admin ID');
+        setLoginError('Invalid Created By value for Admin');
       }
     } catch {
       setLoginError('Failed to verify admin');
@@ -114,6 +120,25 @@ const AdminPanel = () => {
     }
   };
 
+  // Fetch all staff for bill_count section
+  const fetchAllStaff = async () => {
+    setLoadingStaff(true);
+    setStaffError('');
+    try {
+      const res = await axios.get('http://localhost:8000/users/user/all');
+      setAllStaff(res.data.filter(u => u.role === 'staff'));
+    } catch (err) {
+      setStaffError('Failed to fetch staff.');
+    } finally {
+      setLoadingStaff(false);
+    }
+  };
+
+  // Fetch staff on admin login
+  React.useEffect(() => {
+    if (isAdmin) fetchAllStaff();
+  }, [isAdmin]);
+
   // If not logged in as admin, show login form
   if (!isAdmin) {
     return (
@@ -121,10 +146,10 @@ const AdminPanel = () => {
         <Typography variant="h5" sx={{ mb: 2 }}>Admin Login</Typography>
         <form onSubmit={handleAdminLogin}>
           <TextField
-            label="Admin ID"
-            value={adminLoginId}
-            onChange={e => setAdminLoginId(e.target.value)}
-            type="number"
+            label="Created By (Superadmin ID)"
+            value={adminLoginCreatedBy}
+            onChange={e => setAdminLoginCreatedBy(e.target.value)}
+            type="text"
             fullWidth
             required
             sx={{ mb: 2 }}
@@ -140,7 +165,7 @@ const AdminPanel = () => {
   return (
     <Box sx={{ maxWidth: 700, mx: 'auto', mt: 4, p: 2 }}>
       <Paper elevation={3} sx={{ p: 3, mb: 4, background: '#1976d2', color: '#fff' }}>
-        <Typography variant="h5">Welcome, Admin {adminName} (ID: {adminLoginId})</Typography>
+        <Typography variant="h5">Welcome, Admin {adminName} (Created By: {adminLoginCreatedBy})</Typography>
       </Paper>
       <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
         <Typography variant="h5" gutterBottom>
@@ -250,6 +275,42 @@ const AdminPanel = () => {
           ))}
         </List>
       </Paper>
+      {/* Staff Bill Count Section */}
+      <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+        <Typography variant="h5" gutterBottom>Staff Bill Count Overview</Typography>
+        {loadingStaff ? (
+          <Box sx={{ textAlign: 'center', py: 2 }}><CircularProgress /></Box>
+        ) : staffError ? (
+          <Typography color="error">{staffError}</Typography>
+        ) : allStaff.length === 0 ? (
+          <Typography>No staff members found.</Typography>
+        ) : (
+          <TableContainer component={Paper} sx={{ mt: 2 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell><b>Staff Name</b></TableCell>
+                  <TableCell><b>Email</b></TableCell>
+                  <TableCell><b>Area</b></TableCell>
+                  <TableCell><b>Bill Count</b></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {allStaff.map(staff => (
+                  <TableRow key={staff.id}>
+                    <TableCell>{staff.username}</TableCell>
+                    <TableCell>{staff.email}</TableCell>
+                    <TableCell>{staff.area || '-'}</TableCell>
+                    <TableCell><b>{staff.bill_count || 0}</b></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
+      {/* User Section Table (All Users) */}
+      <UserSectionTable />
     </Box>
   );
 };

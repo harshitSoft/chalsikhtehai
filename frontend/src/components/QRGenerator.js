@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Box, Typography, Paper, TextField, Button, Alert } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
 import axios from 'axios';
@@ -16,6 +16,7 @@ const QRGenerator = () => {
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
     const [loading, setLoading] = useState(false);
+    const qrRef = useRef();
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -37,6 +38,31 @@ const QRGenerator = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Download QR as PNG
+    const handleDownloadQR = () => {
+        const svg = qrRef.current.querySelector('svg');
+        const serializer = new XMLSerializer();
+        const svgString = serializer.serializeToString(svg);
+        const canvas = document.createElement('canvas');
+        const img = new window.Image();
+        img.onload = function () {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            const pngFile = canvas.toDataURL('image/png');
+            const downloadLink = document.createElement('a');
+            downloadLink.href = pngFile;
+            downloadLink.download = `user_qr_${form.username || 'qr'}.png`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        };
+        img.src = 'data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(svgString)));
     };
 
     return (
@@ -111,7 +137,7 @@ const QRGenerator = () => {
                     </Button>
                 </form>
                 {qrData && (
-                    <Box sx={{ mt: 3, textAlign: 'center' }}>
+                    <Box sx={{ mt: 3, textAlign: 'center' }} ref={qrRef}>
                         <QRCodeSVG
                             value={JSON.stringify(qrData)}
                             size={256}
@@ -121,6 +147,14 @@ const QRGenerator = () => {
                         <Typography variant="body2" sx={{ mt: 2 }}>
                             Scan this QR code with the scanner to test
                         </Typography>
+                        <Button
+                            variant="outlined"
+                            color="secondary"
+                            sx={{ mt: 2 }}
+                            onClick={handleDownloadQR}
+                        >
+                            Download QR
+                        </Button>
                     </Box>
                 )}
             </Paper>
