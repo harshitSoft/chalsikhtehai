@@ -76,12 +76,15 @@ const QRScanner = () => {
     const [qrMode, setQrMode] = useState('camera');
     const qrFileInputRef = useRef(null);
     const [staffUserId, setStaffUserId] = useState(null);
+    const [scannerKey, setScannerKey] = useState(0);
 
     const fileInputRef = useRef(null);
     const videoRef = useRef(null);
     const streamRef = useRef(null);
     const scannerRef = useRef(null);
     const invoiceRef = useRef(null);
+
+    const [capturedImage, setCapturedImage] = useState(null);
 
     // Styles
     const styles = {
@@ -166,21 +169,30 @@ const QRScanner = () => {
     };
 
     useEffect(() => {
+        let scanner;
         if (qrMode === 'camera' && scannerActive) {
             const readerElem = document.getElementById('reader');
             if (!readerElem) return;
-            const scanner = new Html5QrcodeScanner('reader', {
-                qrbox: { width: 250, height: 250 },
-                fps: 5,
-                aspectRatio: 1.0,
+            scanner = new Html5QrcodeScanner('reader', {
+                qrbox: 300,
+                fps: 15,
+                aspectRatio: 1.333,
                 showTorchButtonIfSupported: true,
                 showZoomSliderIfSupported: true,
+                disableFlip: true,
+                experimentalFeatures: { useBarCodeDetectorIfSupported: true },
             });
             scannerRef.current = scanner;
             scanner.render(onScanSuccess, onScanError);
-            return () => scanner.clear();
         }
-    }, [qrMode, scannerActive]);
+        return () => {
+            if (scannerRef.current) {
+                scannerRef.current.clear().catch(() => {});
+                scannerRef.current = null;
+            }
+        };
+    // eslint-disable-next-line
+    }, [qrMode, scannerActive, scannerKey]);
 
     useEffect(() => {
         if (meterReading && billingData) {
@@ -226,6 +238,7 @@ const QRScanner = () => {
         setError(null);
         setScannerActive(true);
         setQrUserData(null);
+        setScannerKey(prev => prev + 1);
     };
 
     const handleStaffIdSubmit = async (e) => {
@@ -305,31 +318,25 @@ const QRScanner = () => {
         if (!videoRef.current) return;
         setCaptureLoading(true);
         setCaptureError(null);
-
         try {
             const canvas = document.createElement('canvas');
             canvas.width = videoRef.current.videoWidth;
             canvas.height = videoRef.current.videoHeight;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(videoRef.current, 0, 0);
-
             const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
             const formData = new FormData();
             formData.append('file', blob, 'meter_capture.jpg');
-
             const ocrRes = await axios.post('http://localhost:8000/predict', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
-
             const reading = parseFloat(ocrRes.data.result);
             if (isNaN(reading)) throw new Error('Invalid meter reading detected');
-
             const billingRes = await axios.post('http://localhost:8000/update-meter-reading', {
                 username: userData.username,
                 reading,
                 staff_id: staffUserId
             });
-
             setMeterReading(reading);
             setBillingData(billingRes.data);
             setCaptureDialogOpen(false);
@@ -457,7 +464,7 @@ const QRScanner = () => {
                                 <Button
                                     variant={qrMode === 'camera' ? 'contained' : 'outlined'}
                                     startIcon={<QrCodeIcon />}
-                                    onClick={() => { setQrMode('camera'); setScannerActive(true); }}
+                                    onClick={() => { setQrMode('camera'); setScannerActive(true); setScannerKey(prev => prev + 1); }}
                                     size="large"
                                     sx={{ minWidth: 200 }}
                                 >
@@ -485,7 +492,7 @@ const QRScanner = () => {
                             <Box sx={{ p: 2 }}>
                                 {qrMode === 'camera' && (
                                     <>
-                                        <Box id="reader" sx={{ 
+                                        <Box id="reader" key={scannerKey} sx={{ 
                                             width: '100%', 
                                             minHeight: 300,
                                             border: `2px dashed ${theme.palette.grey[300]}`,

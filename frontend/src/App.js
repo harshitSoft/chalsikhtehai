@@ -504,7 +504,7 @@ function HomePage() {
                 icon={<ScanIcon />}
                 title="Scan QR Code"
                 description="Scan customer QR codes to quickly access accounts, record meter readings, and generate bills on the spot with our intuitive interface."
-                image="https://images.unsplash.com/photo-1636051028886-0059ad2383c8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
+                image="https://img.freepik.com/free-vector/smartphone-scanning-qr-code_23-2148624200.jpg"
               />
             </Grid>
             <Grid item xs={12} md={6}>
@@ -513,7 +513,7 @@ function HomePage() {
                 icon={<GenerateIcon />}
                 title="Generate QR"
                 description="Create and manage QR codes for new customer accounts with customizable options for different meter types and locations."
-                image="https://images.unsplash.com/photo-1620288627223-53302f4e8c74?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80"
+                image="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjewbaqTCgB3WYaKNiqNWs9VquPmPAvX_jXg&s"
               />
             </Grid>
           </Grid>
@@ -604,4 +604,4 @@ function App() {
   );
 }
 
-export default App;
+export default App; 

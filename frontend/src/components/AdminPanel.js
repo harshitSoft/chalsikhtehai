@@ -39,7 +39,8 @@ import {
   Person as PersonIcon,
   Receipt as ReceiptIcon,
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon
+  ExpandLess as ExpandLessIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import axios from 'axios';
@@ -113,6 +114,10 @@ const AdminPanel = () => {
     allUsers: false
   });
 
+  // Meter number search state
+  const [meterNumberSearch, setMeterNumberSearch] = useState('');
+  const [meterUserResult, setMeterUserResult] = useState(null);
+
   const toggleSection = (section) => {
     setExpanded(prev => ({ ...prev, [section]: !prev[section] }));
   };
@@ -140,7 +145,7 @@ const AdminPanel = () => {
     e.preventDefault();
     setMessage({ text: '', severity: 'info' });
     
-    if (!form.username || !form.email || !form.role || (form.role !== 'admin' && !form.created_by)) {
+    if (!form.username || !form.email || !form.role || !form.created_by) {
       setMessage({ text: 'Please fill all required fields.', severity: 'error' });
       return;
     }
@@ -158,8 +163,8 @@ const AdminPanel = () => {
     try {
       await axios.post(url, form);
       setMessage({ text: 'User created successfully!', severity: 'success' });
-      // Reset form except for role
       setForm(prev => ({ ...prev, username: '', email: '', created_by: '', area: '' }));
+      if (form.role === 'admin') fetchAdmins();
     } catch (err) {
       setMessage({ text: 'Error: ' + (err.response?.data?.detail || err.message), severity: 'error' });
     }
@@ -224,6 +229,20 @@ const AdminPanel = () => {
   useEffect(() => {
     if (isAdmin) fetchAllStaff();
   }, [isAdmin]);
+
+  // Handle meter number search
+  const handleMeterNumberSearch = async () => {
+    setMeterUserResult(null);
+    if (!meterNumberSearch) return;
+    try {
+      const res = await axios.get(`http://localhost:8000/users/user/all`);
+      const user = res.data.find(u => u.meter_number === meterNumberSearch);
+      if (user) setMeterUserResult(user);
+      else setMeterUserResult(null);
+    } catch (err) {
+      setMeterUserResult(null);
+    }
+  };
 
   // If not logged in as admin, show login form
   if (!isAdmin) {
@@ -380,20 +399,18 @@ const AdminPanel = () => {
                         </Select>
                       </FormControl>
                     </Grid>
-                    {form.role !== 'admin' && (
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label={`Created By ${form.role === 'staff' ? 'Admin' : 'Staff'} ID`}
-                          name="created_by"
-                          value={form.created_by}
-                          onChange={e => setForm({ ...form, created_by: e.target.value })}
-                          margin="normal"
-                          required
-                          variant="outlined"
-                        />
-                      </Grid>
-                    )}
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Created By (ID)"
+                        name="created_by"
+                        value={form.created_by}
+                        onChange={e => setForm({ ...form, created_by: e.target.value })}
+                        margin="normal"
+                        required
+                        variant="outlined"
+                      />
+                    </Grid>
                     <Grid item xs={12}>
                       <TextField
                         fullWidth
@@ -433,8 +450,8 @@ const AdminPanel = () => {
         <Grid item xs={12} md={6}>
           <ExpandableSection>
             <SectionHeader
-              title="All Administrators"
-              subheader="List of all admin users"
+              title="Search User by Meter Number"
+              subheader="Find user details by meter number"
               avatar={
                 <Avatar sx={{ bgcolor: indigo[500] }}>
                   <BusinessIcon />
@@ -449,40 +466,46 @@ const AdminPanel = () => {
             />
             <Collapse in={expanded.allAdmins}>
               <CardContent>
+                <TextField
+                  fullWidth
+                  label="Meter Number"
+                  value={meterNumberSearch || ''}
+                  onChange={e => setMeterNumberSearch(e.target.value)}
+                  margin="normal"
+                  variant="outlined"
+                />
                 <Button
-                  onClick={fetchAdmins}
+                  onClick={handleMeterNumberSearch}
                   variant="outlined"
                   color="primary"
                   fullWidth
                   sx={{ mb: 2 }}
-                  startIcon={<PeopleIcon />}
+                  startIcon={<SearchIcon />}
                 >
-                  Load All Admins
+                  Search User
                 </Button>
-                {admins.length > 0 ? (
+                {meterUserResult ? (
                   <List dense>
-                    {admins.map(a => (
-                      <ListItem key={a.id} divider>
-                        <ListItemText
-                          primary={
-                            <Box display="flex" alignItems="center">
-                              {a.username}
-                              <RoleChip label="Admin" role="admin" size="small" />
-                            </Box>
-                          }
-                          secondary={
-                            <>
-                              <Box component="span" display="block">Email: {a.email}</Box>
-                              <Box component="span" display="block">ID: {a.id} • Area: {a.area || 'N/A'}</Box>
-                            </>
-                          }
-                        />
-                      </ListItem>
-                    ))}
+                    <ListItem divider>
+                      <ListItemText
+                        primary={
+                          <Box display="flex" alignItems="center">
+                            {meterUserResult.username}
+                            <RoleChip label={meterUserResult.role} role={meterUserResult.role} size="small" />
+                          </Box>
+                        }
+                        secondary={
+                          <>
+                            <Box component="span" display="block">Email: {meterUserResult.email}</Box>
+                            <Box component="span" display="block">ID: {meterUserResult.id} • Area: {meterUserResult.area || 'N/A'}</Box>
+                          </>
+                        }
+                      />
+                    </ListItem>
                   </List>
                 ) : (
                   <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 2 }}>
-                    No admins loaded. Click the button above to fetch admin list.
+                    Enter a meter number and click search to find user.
                   </Typography>
                 )}
               </CardContent>
