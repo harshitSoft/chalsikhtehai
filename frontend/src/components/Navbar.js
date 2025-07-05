@@ -19,9 +19,9 @@ const Navbar = () => {
                     <Button color="inherit" component={Link} to="/generate">
                         Generate QR
                     </Button>
-                    <Button color="inherit" component={Link} to="/users">
+                    {/* <Button color="inherit" component={Link} to="/users">
                         Users
-                    </Button>
+                    </Button> */}
                     <Button color="inherit" component={Link} to="/admin-panel">
                         Admin Panel
                     </Button>

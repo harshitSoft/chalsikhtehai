@@ -77,6 +77,8 @@ const QRScanner = () => {
     const qrFileInputRef = useRef(null);
     const [staffUserId, setStaffUserId] = useState(null);
     const [scannerKey, setScannerKey] = useState(0);
+    const [saveLoading, setSaveLoading] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     const fileInputRef = useRef(null);
     const videoRef = useRef(null);
@@ -239,6 +241,7 @@ const QRScanner = () => {
         setScannerActive(true);
         setQrUserData(null);
         setScannerKey(prev => prev + 1);
+        setSaveSuccess(false);
     };
 
     const handleStaffIdSubmit = async (e) => {
@@ -398,6 +401,39 @@ const QRScanner = () => {
         }
     };
 
+    const handleSaveUnits = async () => {
+        if (!userData || !editableReading || editableConsumption === null) {
+            alert('Please ensure all values are filled before saving.');
+            return;
+        }
+
+        try {
+            setSaveLoading(true);
+            setSaveSuccess(false);
+
+            const response = await axios.post('http://localhost:8000/update-units', {
+                username: userData.username,
+                current_unit: editableReading,
+                unit_consumed: editableConsumption,
+                staff_id: staffUserId
+            });
+
+            // Update the billing data with the new values
+            setBillingData(response.data);
+            
+            // Show success message
+            setSaveSuccess(true);
+            
+            // Hide success message after 3 seconds
+            setTimeout(() => setSaveSuccess(false), 3000);
+            
+        } catch (err) {
+            alert(err.response?.data?.detail || 'Failed to save units. Please try again.');
+        } finally {
+            setSaveLoading(false);
+        }
+    };
+
     return (
         <Box sx={{ maxWidth: 'md', mx: 'auto', my: 4, p: { xs: 2, md: 3 } }}>
             {staffPromptOpen ? (
@@ -413,11 +449,11 @@ const QRScanner = () => {
                         Staff Authentication
                     </Typography>
                     <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                        Please enter your Admin ID to start scanning customer QR codes
+                        Please enter your Staff Code to start scanning customer QR codes
                     </Typography>
                     <form onSubmit={handleStaffIdSubmit}>
                         <TextField
-                            label="Admin ID"
+                            label="Staff Code"
                             value={staffId}
                             onChange={e => setStaffId(e.target.value)}
                             type="text"
@@ -447,7 +483,7 @@ const QRScanner = () => {
                         textAlign: 'center'
                     }}>
                         <Typography variant="subtitle1">
-                            Staff: <strong>{staffName}</strong> (Admin ID: {staffId})
+                           Billed By: <strong>{staffName}</strong> 
                         </Typography>
                     </Box>
 
@@ -756,6 +792,15 @@ const QRScanner = () => {
                                                 </Grid>
                                             </Grid>
 
+                                            {/* Save Units Note */}
+                                            {/* <Alert severity="info" sx={{ mt: 2, mb: 3 }} className="no-print">
+                                                <Typography variant="body2">
+                                                    <strong>Note:</strong> You can edit the Current Reading and Consumption values above. 
+                                                    Use the "Save Units" button to update these values in the database for future use. 
+                                                    The saved values will not affect the current invoice generation.
+                                                </Typography>
+                                            </Alert> */}
+
                                             {/* Billing Details */}
                                             <Typography variant="h6" sx={styles.sectionHeader}>
                                                 <MoneyIcon color="primary" sx={{ mr: 1 }} />
@@ -842,6 +887,13 @@ const QRScanner = () => {
                                                 </Typography>
                                             </Box>
 
+                                            {/* Save Units Section */}
+                                            {saveSuccess && (
+                                                <Alert severity="success" sx={{ mt: 2, mb: 2 }}>
+                                                    Units saved successfully! The updated values are now stored in the database.
+                                                </Alert>
+                                            )}
+
                                             {/* Action Buttons */}
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
                                                 <Button 
@@ -854,6 +906,17 @@ const QRScanner = () => {
                                                     Scan Another
                                                 </Button>
                                                 <Stack direction="row" spacing={2}>
+                                                    <Button 
+                                                        variant="contained" 
+                                                        color="success"
+                                                        onClick={handleSaveUnits}
+                                                        disabled={saveLoading}
+                                                        startIcon={<CheckCircleIcon />}
+                                                        className="no-print"
+                                                        sx={{ minWidth: 150 }}
+                                                    >
+                                                        {saveLoading ? 'Saving...' : 'Save Units'}
+                                                    </Button>
                                                     <Button 
                                                         variant="contained" 
                                                         color="primary"

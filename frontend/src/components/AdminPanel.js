@@ -275,7 +275,7 @@ const AdminPanel = () => {
           <CardContent>
             <form onSubmit={handleAdminLogin}>
               <TextField
-                label="Created By (Superadmin ID)"
+                label="Enter Admin Code"
                 value={adminLoginCreatedBy}
                 onChange={e => setAdminLoginCreatedBy(e.target.value)}
                 type="text"
@@ -324,7 +324,7 @@ const AdminPanel = () => {
                     Admin Dashboard
                   </Typography>
                   <Typography variant="subtitle1">
-                    Welcome back, {adminName} (ID: {adminLoginCreatedBy})
+                    Welcome back, {adminName}
                   </Typography>
                 </Box>
               </Box>
@@ -336,7 +336,7 @@ const AdminPanel = () => {
         <Grid item xs={12} md={6}>
           <ExpandableSection>
             <SectionHeader
-              title="Create New User"
+              title="Create New "
               subheader="Add admin, staff or customer"
               avatar={
                 <Avatar sx={{ bgcolor: pink[500] }}>
@@ -402,7 +402,7 @@ const AdminPanel = () => {
                     <Grid item xs={12}>
                       <TextField
                         fullWidth
-                        label="Created By (ID)"
+                        label="Unique Code"
                         name="created_by"
                         value={form.created_by}
                         onChange={e => setForm({ ...form, created_by: e.target.value })}
@@ -535,7 +535,7 @@ const AdminPanel = () => {
               <CardContent>
                 <TextField
                   fullWidth
-                  label="Admin ID"
+                  label="Staff Code"
                   value={adminId}
                   onChange={e => setAdminId(e.target.value)}
                   margin="normal"
@@ -574,7 +574,7 @@ const AdminPanel = () => {
                   </List>
                 ) : (
                   <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 2 }}>
-                    Enter Admin ID and click the button to fetch staff members.
+                    Enter Staff Code and click the button to fetch staff members.
                   </Typography>
                 )}
               </CardContent>
@@ -586,8 +586,8 @@ const AdminPanel = () => {
         <Grid item xs={12} md={6}>
           <ExpandableSection>
             <SectionHeader
-              title="Customer List"
-              subheader="Customers managed by specific staff"
+              title="Unpaid Customers"
+              subheader="Customers managed by Unpaid status"
               avatar={
                 <Avatar sx={{ bgcolor: blue[500] }}>
                   <PersonIcon />

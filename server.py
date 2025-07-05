@@ -58,6 +58,12 @@ class MeterReadingData(BaseModel):
     reading: float
     staff_id: int
 
+class UpdateUnitsData(BaseModel):
+    username: str
+    current_unit: float
+    unit_consumed: float
+    staff_id: int
+
 # ============================= #
 # === Database Dependency ===== #
 # ============================= #
@@ -233,30 +239,65 @@ async def update_meter_reading(reading_data: MeterReadingData, db: Session = Dep
                 detail=f"User with username '{reading_data.username}' not found"
             )
         
-        # Update readings
-        user.last_unit = user.current_unit
-        user.current_unit = reading_data.reading
-        user.unit_consumed = user.current_unit - (user.last_unit or 0)
+        # Store the current unit as the last unit (this will become the previous reading)
+        previous_current_unit = user.current_unit or 0
+        
+        # Log the values for debugging
+        logger.info(f"Before update - last_unit: {user.last_unit}, current_unit: {user.current_unit}, new_reading: {reading_data.reading}")
+        
+        # Update readings with proper swap
+        user.last_unit = previous_current_unit  # Move current to last
+        user.current_unit = reading_data.reading  # Set new reading as current
+        
+        # Calculate consumption using the previous current unit (now stored as last_unit)
+        user.unit_consumed = user.current_unit - user.last_unit
+        
+        # Validate the calculation
+        expected_consumption = reading_data.reading - previous_current_unit
+        logger.info(f"Validation - expected_consumption: {expected_consumption}, calculated_consumption: {user.unit_consumed}")
+        
+        # Ensure the calculation is correct
+        if abs(user.unit_consumed - expected_consumption) > 0.01:
+            logger.warning(f"Consumption calculation mismatch! Expected: {expected_consumption}, Got: {user.unit_consumed}")
+            user.unit_consumed = expected_consumption
+        
+        # Log the values after update
+        logger.info(f"After update - last_unit: {user.last_unit}, current_unit: {user.current_unit}, unit_consumed: {user.unit_consumed}")
+        
         user.last_reading_date = datetime.utcnow()
         
-        # Calculate billing (example rate: ₹5 per unit)
-        RATE_PER_UNIT = 5
-        user.total_amount = user.unit_consumed * RATE_PER_UNIT
+        # Calculate billing (rate: ₹12.5 per unit + ₹75 fixed charge)
+        RATE_PER_UNIT = 12.5
+        FIXED_CHARGE = 75
+        base_amount = (user.unit_consumed * RATE_PER_UNIT) + FIXED_CHARGE
+        gst = base_amount * 0.18
+        user.total_amount = base_amount + gst
         
         # Increment bill_count for staff
         staff = db.query(User).filter(User.id == reading_data.staff_id, User.role == 'staff').first()
         if staff:
             staff.bill_count = (staff.bill_count or 0) + 1
         
+        # Commit changes to database
         db.commit()
+        
+        # Refresh user object to get the latest values from database
         db.refresh(user)
         
+        # Log final values being returned
+        logger.info(f"Final values being returned - last_unit: {user.last_unit}, current_unit: {user.current_unit}, unit_consumed: {user.unit_consumed}")
+        
+        # Return the updated values from database
         return {
             "username": user.username,
             "current_unit": user.current_unit,
             "last_unit": user.last_unit,
             "unit_consumed": user.unit_consumed,
             "total_amount": user.total_amount,
+            "base_amount": base_amount,
+            "gst_amount": gst,
+            "rate_per_unit": RATE_PER_UNIT,
+            "fixed_charge": FIXED_CHARGE,
             "last_reading_date": user.last_reading_date.isoformat(),
             "message": "Meter reading updated successfully",
             "status": "success"
@@ -268,6 +309,74 @@ async def update_meter_reading(reading_data: MeterReadingData, db: Session = Dep
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error updating meter reading: {str(e)}"
+        )
+
+# ============================= #
+# === Update Units Endpoint === #
+# ============================= #
+@app.post("/update-units")
+async def update_units(units_data: UpdateUnitsData, db: Session = Depends(get_db)):
+    """
+    Endpoint to update units without affecting invoice generation
+    """
+    try:
+        logger.info(f"Updating units for user: {units_data.username}")
+        
+        # Get user
+        user = db.query(User).filter(User.username == units_data.username).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with username '{units_data.username}' not found"
+            )
+        
+        # Log the values before update
+        logger.info(f"Before update - last_unit: {user.last_unit}, current_unit: {user.current_unit}, unit_consumed: {user.unit_consumed}")
+        
+        # Update the units
+        user.current_unit = units_data.current_unit
+        user.unit_consumed = units_data.unit_consumed
+        
+        # Recalculate total amount based on updated consumption
+        RATE_PER_UNIT = 12.5
+        FIXED_CHARGE = 75
+        base_amount = (user.unit_consumed * RATE_PER_UNIT) + FIXED_CHARGE
+        gst = base_amount * 0.18
+        user.total_amount = base_amount + gst
+        
+        # Update last reading date
+        user.last_reading_date = datetime.utcnow()
+        
+        # Commit changes to database
+        db.commit()
+        
+        # Refresh user object to get the latest values from database
+        db.refresh(user)
+        
+        # Log final values being returned
+        logger.info(f"After update - last_unit: {user.last_unit}, current_unit: {user.current_unit}, unit_consumed: {user.unit_consumed}")
+        
+        return {
+            "username": user.username,
+            "current_unit": user.current_unit,
+            "last_unit": user.last_unit,
+            "unit_consumed": user.unit_consumed,
+            "total_amount": user.total_amount,
+            "base_amount": base_amount,
+            "gst_amount": gst,
+            "rate_per_unit": RATE_PER_UNIT,
+            "fixed_charge": FIXED_CHARGE,
+            "last_reading_date": user.last_reading_date.isoformat(),
+            "message": "Units updated successfully",
+            "status": "success"
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error in update_units: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating units: {str(e)}"
         )
 
 # ============================= #
